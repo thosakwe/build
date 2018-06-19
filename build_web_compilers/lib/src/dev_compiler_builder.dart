@@ -39,10 +39,13 @@ class DevCompilerBuilder implements Builder {
 
   @override
   Future build(BuildStep buildStep) async {
+    var watch = new Stopwatch()..start();
+    log.warning('Reading module: ${watch.elapsed}');
     var module = new Module.fromJson(
         json.decode(await buildStep.readAsString(buildStep.inputId))
             as Map<String, dynamic>);
-
+    log.warning('Done reading module: ${watch.elapsed}');
+    
     Future<Null> handleError(e) async {
       await buildStep.writeAsString(
           buildStep.inputId.changeExtension(jsModuleErrorsExtension), '$e');
@@ -50,7 +53,7 @@ class DevCompilerBuilder implements Builder {
     }
 
     try {
-      await _createDevCompilerModule(module, buildStep, useKernel);
+      await _createDevCompilerModule(module, buildStep, useKernel, watch);
     } on DartDevcCompilationException catch (e) {
       await handleError(e);
     } on MissingModulesException catch (e) {
@@ -61,9 +64,11 @@ class DevCompilerBuilder implements Builder {
 
 /// Compile [module] with the dev compiler.
 Future _createDevCompilerModule(
-    Module module, BuildStep buildStep, bool useKernel,
+    Module module, BuildStep buildStep, bool useKernel, Stopwatch watch,
     {bool debugMode = true}) async {
+  log.warning('Computing deps: ${watch.elapsed}');
   var transitiveDeps = await module.computeTransitiveDependencies(buildStep);
+  log.warning('Done computing deps: ${watch.elapsed}');
   var transitiveSummaryDeps = transitiveDeps.map(
       (module) => useKernel ? module.kernelSummaryId : module.linkedSummaryId);
   var scratchSpace = await buildStep.fetchResource(scratchSpaceResource);
@@ -71,7 +76,9 @@ Future _createDevCompilerModule(
   var allAssetIds = new Set<AssetId>()
     ..addAll(module.sources)
     ..addAll(transitiveSummaryDeps);
+  log.warning('Ensuring assets: ${watch.elapsed}');
   await scratchSpace.ensureAssets(allAssetIds, buildStep, logger: log);
+  log.warning('Done ensuring assets: ${watch.elapsed}');
   var jsId = module.jsId(jsModuleExtension);
   var jsOutputFile = scratchSpace.fileFor(jsId);
   var sdkSummary = p.url
@@ -162,10 +169,13 @@ Future _createDevCompilerModule(
 
   WorkResponse response;
   try {
+    log.warning('Waiting for worker: ${watch.elapsed}');
     var driverResource =
         useKernel ? dartdevkDriverResource : dartdevcDriverResource;
     var driver = await buildStep.fetchResource(driverResource);
+    log.warning('Worker ready, sending request: ${watch.elapsed}');
     response = await driver.doWork(request);
+    log.warning('DDC finished: ${watch.elapsed}');
   } finally {
     if (useKernel) await packagesFile.parent.delete(recursive: true);
   }
@@ -179,10 +189,12 @@ Future _createDevCompilerModule(
     throw new DartDevcCompilationException(jsId, '$message}');
   } else {
     // Copy the output back using the buildStep.
+    log.warning('Copying output: ${watch.elapsed}');
     await scratchSpace.copyOutput(jsId, buildStep);
     if (debugMode) {
       await scratchSpace.copyOutput(
           module.jsSourceMapId(jsSourceMapExtension), buildStep);
     }
+    log.warning('Done copying output: ${watch.elapsed}');
   }
 }
