@@ -71,7 +71,7 @@ Future _createDevCompilerModule(
   var allAssetIds = new Set<AssetId>()
     ..addAll(module.sources)
     ..addAll(transitiveSummaryDeps);
-  await scratchSpace.ensureAssets(allAssetIds, buildStep);
+  await scratchSpace.ensureAssets(allAssetIds, buildStep, logger: log);
   var jsId = module.jsId(jsModuleExtension);
   var jsOutputFile = scratchSpace.fileFor(jsId);
   var sdkSummary = p.url
@@ -87,7 +87,7 @@ Future _createDevCompilerModule(
 
   if (!useKernel) {
     // Add the default analysis_options.
-    await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep);
+    await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep, logger: log);
     var libraryRoot = '/${p.split(p.dirname(jsId.path)).first}';
     request.arguments.addAll([
       '--module-root=.',

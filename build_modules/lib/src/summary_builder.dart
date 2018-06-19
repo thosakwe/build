@@ -69,7 +69,7 @@ class LinkedSummaryBuilder implements Builder {
 Future _createUnlinkedSummary(Module module, BuildStep buildStep,
     {bool isRoot = false}) async {
   var scratchSpace = await buildStep.fetchResource(scratchSpaceResource);
-  await scratchSpace.ensureAssets(module.sources, buildStep);
+  await scratchSpace.ensureAssets(module.sources, buildStep, logger: log);
 
   var summaryOutputFile = scratchSpace.fileFor(module.unlinkedSummaryId);
   var request = new WorkRequest();
@@ -81,7 +81,7 @@ Future _createUnlinkedSummary(Module module, BuildStep buildStep,
   ]);
 
   // Add the default analysis_options.
-  await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep);
+  await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep, logger: log);
   request.arguments.add(defaultAnalysisOptionsArg(scratchSpace));
 
   // Add all the files to include in the unlinked summary bundle.
@@ -123,7 +123,7 @@ Future _createLinkedSummary(Module module, BuildStep buildStep,
     ..addAll(module.sources)
     ..addAll(transitiveLinkedSummaryDeps)
     ..addAll(transitiveUnlinkedSummaryDeps);
-  await scratchSpace.ensureAssets(allAssetIds, buildStep);
+  await scratchSpace.ensureAssets(allAssetIds, buildStep, logger: log);
   var summaryOutputFile = scratchSpace.fileFor(module.linkedSummaryId);
   var request = new WorkRequest();
   request.arguments.addAll([
@@ -133,7 +133,7 @@ Future _createLinkedSummary(Module module, BuildStep buildStep,
   ]);
 
   // Add the default analysis_options.
-  await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep);
+  await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep, logger: log);
   request.arguments.add(defaultAnalysisOptionsArg(scratchSpace));
 
   // Add all the unlinked and linked summaries as build summary inputs.

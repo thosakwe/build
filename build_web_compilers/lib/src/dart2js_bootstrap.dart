@@ -29,7 +29,7 @@ Future<Null> bootstrapDart2Js(
     ..add(module);
   var allSrcs = allDeps.expand((module) => module.sources);
   var scratchSpace = await buildStep.fetchResource(scratchSpaceResource);
-  await scratchSpace.ensureAssets(allSrcs, buildStep);
+  await scratchSpace.ensureAssets(allSrcs, buildStep, logger: log);
 
   var packageFile = await _createPackageFile(allSrcs, buildStep, scratchSpace);
 

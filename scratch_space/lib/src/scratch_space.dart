@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:build/build.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 
@@ -75,7 +76,9 @@ class ScratchSpace {
   /// Any asset that is under a `lib` dir will be output under a `packages`
   /// directory corresponding to its package, and any other assets are output
   /// directly under the temp dir using their unmodified path.
-  Future ensureAssets(Iterable<AssetId> assetIds, AssetReader reader) {
+  Future ensureAssets(Iterable<AssetId> assetIds, AssetReader reader, {Logger logger}) {
+    var watch = new Stopwatch();
+    watch.start();
     if (!exists) {
       throw new StateError('Tried to use a deleted ScratchSpace!');
     }
@@ -104,7 +107,10 @@ class ScratchSpace {
         futures.add(done);
       }
     }
-    return Future.wait(futures, eagerError: true);
+    return Future.wait(futures, eagerError: true).then((_) {
+      watch.stop();
+      logger?.warning('EnsureAssets took: ${watch.elapsed} for ${assetIds.length} files');
+    });
   }
 
   /// Returns the actual [File] in this environment corresponding to [id].
