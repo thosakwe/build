@@ -45,7 +45,7 @@ class DevCompilerBuilder implements Builder {
         json.decode(await buildStep.readAsString(buildStep.inputId))
             as Map<String, dynamic>);
     log.warning('Done reading module: ${watch.elapsed}');
-    
+
     Future<Null> handleError(e) async {
       await buildStep.writeAsString(
           buildStep.inputId.changeExtension(jsModuleErrorsExtension), '$e');
@@ -94,7 +94,8 @@ Future _createDevCompilerModule(
 
   if (!useKernel) {
     // Add the default analysis_options.
-    await scratchSpace.ensureAssets([defaultAnalysisOptionsId], buildStep, logger: log);
+    await scratchSpace
+        .ensureAssets([defaultAnalysisOptionsId], buildStep, logger: log);
     var libraryRoot = '/${p.split(p.dirname(jsId.path)).first}';
     request.arguments.addAll([
       '--module-root=.',
@@ -120,13 +121,24 @@ Future _createDevCompilerModule(
   }
 
   // Add all the linked summaries as summary inputs.
+  var futures = <Future>[];
   for (var id in transitiveSummaryDeps) {
     var summaryPath = useKernel
         ? p.url.relative(scratchSpace.fileFor(id).path,
             from: scratchSpace.tempDir.path)
         : scratchSpace.fileFor(id).path;
     request.arguments.addAll(['-s', summaryPath]);
+    if (!useKernel) {
+      futures.add(buildStep.digest(id).then((digest) {
+        request.inputs.add(new Input()
+          ..digest = digest.bytes
+          ..path = summaryPath);
+      }));
+    }
   }
+  log.warning('Computing digests: ${watch.elapsed}');
+  await Future.wait(futures);
+  log.warning('Done computing digests: ${watch.elapsed}');
 
   // Add URL mappings for all the package: files to tell DartDevc where to
   // find them.
@@ -169,7 +181,6 @@ Future _createDevCompilerModule(
 
   WorkResponse response;
   try {
-    log.warning('Waiting for worker: ${watch.elapsed}');
     var driverResource =
         useKernel ? dartdevkDriverResource : dartdevcDriverResource;
     var driver = await buildStep.fetchResource(driverResource);
@@ -189,12 +200,13 @@ Future _createDevCompilerModule(
     throw new DartDevcCompilationException(jsId, '$message}');
   } else {
     // Copy the output back using the buildStep.
-    log.warning('Copying output: ${watch.elapsed}');
     await scratchSpace.copyOutput(jsId, buildStep);
     if (debugMode) {
       await scratchSpace.copyOutput(
           module.jsSourceMapId(jsSourceMapExtension), buildStep);
     }
-    log.warning('Done copying output: ${watch.elapsed}');
+    if (response.output?.isNotEmpty == true) {
+      log.warning(response.output);
+    }
   }
 }
