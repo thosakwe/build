@@ -8,6 +8,7 @@ import 'dart:convert';
 
 import 'package:build/build.dart';
 import 'package:convert/convert.dart';
+import 'package:crclib/crclib.dart';
 import 'package:crypto/crypto.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
@@ -192,6 +193,7 @@ class _SingleBuild {
       final failures = _assetGraph.failedOutputs
           .where((n) => optionalOutputTracker.isRequired(n.id));
       if (failures.isNotEmpty) {
+        _logger.severe(failures.map((output) => output.id).toList());
         await _failureReporter.reportErrors(failures);
         result = new BuildResult(BuildStatus.failure, result.outputs,
             performance: result.performance);
@@ -277,6 +279,7 @@ class _SingleBuild {
       if (!done.isCompleted) done.complete(result);
     }, onError: (e, StackTrace st) {
       if (!done.isCompleted) {
+        _logger.severe('Unhandled exceptin', e, st);
         done.complete(new BuildResult(BuildStatus.failure, []));
       }
     });
@@ -632,10 +635,10 @@ class _SingleBuild {
 
   /// Computes a single [Digest] based on the combined [Digest]s of [ids] and
   /// [builderOptionsId].
-  Future<Digest> _computeCombinedDigest(Iterable<AssetId> ids,
+  Future<int> _computeCombinedDigest(Iterable<AssetId> ids,
       AssetId builderOptionsId, AssetReader reader) async {
-    var digestSink = new AccumulatorSink<Digest>();
-    var bytesSink = md5.startChunkedConversion(digestSink);
+    var digestSink = new AccumulatorSink<int>();
+    var bytesSink = new Crc64Xz().startChunkedConversion(digestSink);
 
     var builderOptionsNode = _assetGraph.get(builderOptionsId);
     bytesSink.add(builderOptionsNode.lastKnownDigest.bytes);

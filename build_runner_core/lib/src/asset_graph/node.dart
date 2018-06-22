@@ -153,7 +153,7 @@ class GeneratedAssetNode extends AssetNode {
   ///
   /// Used to determine whether all the inputs to a build step are identical to
   /// the previous run, indicating that the previous output is still valid.
-  Digest previousInputsDigest;
+  int previousInputsDigest;
 
   /// Whether the action which did or would produce this node failed.
   bool isFailure;
@@ -244,7 +244,7 @@ class PostProcessAnchorNode extends AssetNode with _SyntheticAssetNode {
   final int actionNumber;
   final AssetId builderOptionsId;
   final AssetId primaryInput;
-  Digest previousInputsDigest;
+  int previousInputsDigest;
 
   PostProcessAnchorNode(
       AssetId id, this.primaryInput, this.actionNumber, this.builderOptionsId,

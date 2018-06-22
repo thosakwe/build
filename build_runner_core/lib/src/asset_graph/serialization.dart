@@ -8,7 +8,7 @@ part of 'graph.dart';
 ///
 /// This should be incremented any time the serialize/deserialize formats
 /// change.
-const _version = 21;
+const _version = 22;
 
 /// Deserializes an [AssetGraph] from a [Map].
 class _AssetGraphDeserializer {
@@ -106,8 +106,8 @@ class _AssetGraphDeserializer {
                   .map((pattern) => new Glob(pattern as String))
                   .toSet(),
           lastKnownDigest: digest,
-          previousInputsDigest: _deserializeDigest(serializedNode[
-              _GeneratedField.PreviousInputsDigest.index + offset] as String),
+          previousInputsDigest: serializedNode[
+              _GeneratedField.PreviousInputsDigest.index + offset] as int,
           isHidden: _deserializeBool(
               serializedNode[_GeneratedField.IsHidden.index + offset] as int),
         );
@@ -136,9 +136,8 @@ class _AssetGraphDeserializer {
             _idToAssetId[
                 serializedNode[_PostAnchorField.BuilderOptions.index + offset]
                     as int],
-            previousInputsDigest: _deserializeDigest(serializedNode[
-                    _PostAnchorField.PreviousInputsDigest.index + offset]
-                as String));
+            previousInputsDigest: serializedNode[
+                _PostAnchorField.PreviousInputsDigest.index + offset] as int);
     }
     node.outputs.addAll(_deserializeAssetIds(
         serializedNode[_AssetField.Outputs.index] as List));
@@ -349,7 +348,7 @@ class _WrappedGeneratedAssetNode extends _WrappedAssetNode {
       case _GeneratedField.State:
         return generatedNode.state.index;
       case _GeneratedField.PreviousInputsDigest:
-        return _serializeDigest(generatedNode.previousInputsDigest);
+        return generatedNode.previousInputsDigest;
       case _GeneratedField.BuilderOptions:
         return serializer._assetIdToId[generatedNode.builderOptionsId];
       case _GeneratedField.IsHidden:
@@ -390,7 +389,7 @@ class _WrappedPostProcessAnchorNode extends _WrappedAssetNode {
       case _PostAnchorField.BuilderOptions:
         return serializer._assetIdToId[wrappedNode.builderOptionsId];
       case _PostAnchorField.PreviousInputsDigest:
-        return _serializeDigest(wrappedNode.previousInputsDigest);
+        return wrappedNode.previousInputsDigest;
       case _PostAnchorField.PrimaryInput:
         return wrappedNode.primaryInput != null
             ? serializer._assetIdToId[wrappedNode.primaryInput]
