@@ -24,7 +24,7 @@ part 'serialization.dart';
 /// All the [AssetId]s involved in a build, and all of their outputs.
 class AssetGraph {
   /// All the [AssetNode]s in the graph, indexed by package and then path.
-  final _nodesByPackage = <String, Map<String, AssetNode>>{};
+  final _nodesByPackage = new HashMap<String, List<AssetNode>>();
 
   /// A [Digest] of the build actions this graph was originally created with.
   ///
@@ -67,14 +67,11 @@ class AssetGraph {
 
   /// Checks if [id] exists in the graph.
   bool contains(AssetId id) =>
-      _nodesByPackage[id.package]?.containsKey(id.path) ?? false;
+      _nodesByPackage[id.package]?.any((n) => n.id.path == id.path) ?? false;
 
   /// Gets the [AssetNode] for [id], if one exists.
-  AssetNode get(AssetId id) {
-    var pkg = _nodesByPackage[id?.package];
-    if (pkg == null) return null;
-    return pkg[id.path];
-  }
+  AssetNode get(AssetId id) => _nodesByPackage[id?.package]
+      ?.firstWhere((n) => n.id.path == id.path, orElse: () => null);
 
   /// Adds [node] to the graph if it doesn't exist.
   ///
@@ -85,7 +82,8 @@ class AssetGraph {
       if (existing is SyntheticSourceAssetNode) {
         // Don't call _removeRecursive, that recursively removes all transitive
         // primary outputs. We only want to remove this node.
-        _nodesByPackage[existing.id.package].remove(existing.id.path);
+        _nodesByPackage[existing.id.package]
+            .removeWhere((n) => n.id.path == existing.id.path);
         node.outputs.addAll(existing.outputs);
         node.primaryOutputs.addAll(existing.primaryOutputs);
       } else {
@@ -94,7 +92,7 @@ class AssetGraph {
             'exists.');
       }
     }
-    _nodesByPackage.putIfAbsent(node.id.package, () => {})[node.id.path] = node;
+    _nodesByPackage.putIfAbsent(node.id.package, () => []).add(node);
   }
 
   /// Adds [assetIds] as [InternalAssetNode]s to this graph.
@@ -193,18 +191,18 @@ class AssetGraph {
     }
     // Synthetic nodes need to be kept to retain dependency tracking.
     if (node is! SyntheticSourceAssetNode) {
-      _nodesByPackage[id.package].remove(id.path);
+      _nodesByPackage[id.package].removeWhere((n) => n.id.path == id.path);
     }
     return removedIds;
   }
 
   /// All nodes in the graph, whether source files or generated outputs.
   Iterable<AssetNode> get allNodes =>
-      _nodesByPackage.values.expand((pkdIds) => pkdIds.values);
+      _nodesByPackage.values.expand((nodes) => nodes);
 
   /// All nodes in the graph for `package`.
   Iterable<AssetNode> packageNodes(String package) =>
-      _nodesByPackage[package]?.values ?? [];
+      _nodesByPackage[package] ?? [];
 
   /// All the generated outputs in the graph.
   Iterable<AssetId> get outputs =>
