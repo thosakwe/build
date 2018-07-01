@@ -64,6 +64,31 @@ class RunCommand extends BuildRunnerCommand {
         .uri
         .toFilePath();
 
+    // Find the path of the script to run.
+    var scriptPath = p.setExtension(p.join(tempPath, scriptName), '.dart');
+    var packageConfigPath = p.join(tempPath, '.packages');
+
+    var outputMap = options.outputMap ?? {};
+    outputMap.addAll({tempPath: null});
+
+    try {
+      if (argResults['hot'] != true) {
+        return await runFromSingleBuild(
+            options, scriptPath, passedArgs, packageConfigPath, outputMap);
+      } else {}
+    } finally {
+      // Clean up the output dir.
+      var dir = new Directory(tempPath);
+      if (await dir.exists()) await dir.delete(recursive: true);
+    }
+  }
+
+  Future<int> runFromSingleBuild(
+      SharedOptions options,
+      String scriptPath,
+      List<String> passedArgs,
+      String packageConfigPath,
+      Map<String, String> outputMap) async {
     // Create two ReceivePorts, so that we can quit when the isolate is done.
     //
     // Define these before starting the isolate, so that we can close
@@ -71,9 +96,6 @@ class RunCommand extends BuildRunnerCommand {
     ReceivePort onExit, onError;
 
     try {
-      var outputMap = options.outputMap ?? {};
-      outputMap.addAll({tempPath: null});
-
       var result = await build(
         builderApplications,
         deleteFilesByDefault: options.deleteFilesByDefault,
@@ -95,10 +117,6 @@ class RunCommand extends BuildRunnerCommand {
         stdout.writeln('Skipping script run due to build failure');
         return result.failureType.exitCode;
       }
-
-      // Find the path of the script to run.
-      var scriptPath = p.setExtension(p.join(tempPath, scriptName), '.dart');
-      var packageConfigPath = p.join(tempPath, '.packages');
 
       // Use a completer to determine the exit code.
       var completer = new Completer<int>();
@@ -141,10 +159,6 @@ class RunCommand extends BuildRunnerCommand {
       stderr.writeln(
           'Could not spawn isolate. Ensure that your file is in a valid directory (i.e. "lib", "web", "test).');
       return ExitCode.ioError.code;
-    } finally {
-      // Clean up the output dir.
-      var dir = new Directory(tempPath);
-      if (await dir.exists()) await dir.delete(recursive: true);
     }
   }
 }
