@@ -72,6 +72,33 @@ class RunCommand extends BuildRunnerCommand {
     outputMap.addAll({tempPath: null});
 
     try {
+      if (argResults['hot'] != true) {
+        return await runFromSingleBuild(
+            options, scriptPath, passedArgs, packageConfigPath, outputMap);
+      } else {
+        return await runWithHotReloading(
+            options, scriptPath, passedArgs, packageConfigPath, outputMap);
+      }
+    } finally {
+      // Clean up the output dir.
+      var dir = new Directory(tempPath);
+      if (await dir.exists()) await dir.delete(recursive: true);
+    }
+  }
+
+  Future<int> runFromSingleBuild(
+      SharedOptions options,
+      String scriptPath,
+      List<String> passedArgs,
+      String packageConfigPath,
+      Map<String, String> outputMap) async {
+    // Create two ReceivePorts, so that we can quit when the isolate is done.
+    //
+    // Define these before starting the isolate, so that we can close
+    // them if there is a spawn exception.
+    ReceivePort onExit, onError;
+
+    try {
       var result = await build(
         builderApplications,
         deleteFilesByDefault: options.deleteFilesByDefault,
@@ -94,32 +121,6 @@ class RunCommand extends BuildRunnerCommand {
         return result.failureType.exitCode;
       }
 
-      if (argResults['hot'] != true) {
-        return await runFromSingleBuild(
-            options, scriptPath, passedArgs, packageConfigPath, outputMap);
-      } else {
-        return await runWithHotReloading(options, scriptPath, passedArgs, packageConfigPath, outputMap);
-      }
-    } finally {
-      // Clean up the output dir.
-      var dir = new Directory(tempPath);
-      if (await dir.exists()) await dir.delete(recursive: true);
-    }
-  }
-
-  Future<int> runFromSingleBuild(
-      SharedOptions options,
-      String scriptPath,
-      List<String> passedArgs,
-      String packageConfigPath,
-      Map<String, String> outputMap) async {
-    // Create two ReceivePorts, so that we can quit when the isolate is done.
-    //
-    // Define these before starting the isolate, so that we can close
-    // them if there is a spawn exception.
-    ReceivePort onExit, onError;
-
-    try {
       // Use a completer to determine the exit code.
       var completer = new Completer<int>();
 
