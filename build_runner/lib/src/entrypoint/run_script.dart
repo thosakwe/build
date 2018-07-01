@@ -72,6 +72,28 @@ class RunCommand extends BuildRunnerCommand {
     outputMap.addAll({tempPath: null});
 
     try {
+      var result = await build(
+        builderApplications,
+        deleteFilesByDefault: options.deleteFilesByDefault,
+        enableLowResourcesMode: options.enableLowResourcesMode,
+        configKey: options.configKey,
+        assumeTty: options.assumeTty,
+        outputMap: outputMap,
+        packageGraph: packageGraph,
+        verbose: options.verbose,
+        builderConfigOverrides: options.builderConfigOverrides,
+        isReleaseBuild: options.isReleaseBuild,
+        trackPerformance: options.trackPerformance,
+        skipBuildScriptCheck: options.skipBuildScriptCheck,
+        buildDirs: options.buildDirs,
+        logPerformanceDir: options.logPerformanceDir,
+      );
+
+      if (result.status == BuildStatus.failure) {
+        stdout.writeln('Skipping script run due to build failure');
+        return result.failureType.exitCode;
+      }
+
       if (argResults['hot'] != true) {
         return await runFromSingleBuild(
             options, scriptPath, passedArgs, packageConfigPath, outputMap);
@@ -96,28 +118,6 @@ class RunCommand extends BuildRunnerCommand {
     ReceivePort onExit, onError;
 
     try {
-      var result = await build(
-        builderApplications,
-        deleteFilesByDefault: options.deleteFilesByDefault,
-        enableLowResourcesMode: options.enableLowResourcesMode,
-        configKey: options.configKey,
-        assumeTty: options.assumeTty,
-        outputMap: outputMap,
-        packageGraph: packageGraph,
-        verbose: options.verbose,
-        builderConfigOverrides: options.builderConfigOverrides,
-        isReleaseBuild: options.isReleaseBuild,
-        trackPerformance: options.trackPerformance,
-        skipBuildScriptCheck: options.skipBuildScriptCheck,
-        buildDirs: options.buildDirs,
-        logPerformanceDir: options.logPerformanceDir,
-      );
-
-      if (result.status == BuildStatus.failure) {
-        stdout.writeln('Skipping script run due to build failure');
-        return result.failureType.exitCode;
-      }
-
       // Use a completer to determine the exit code.
       var completer = new Completer<int>();
 
