@@ -27,6 +27,11 @@ class RunCommand extends BuildRunnerCommand {
       '${super.invocation.replaceFirst('[arguments]', '[build-arguments]')} '
       '<executable> [-- [script-arguments]]';
 
+  RunCommand() : super() {
+    argParser.addFlag('watch',
+        abbr: 'w', help: 'Hot-reload the Dart script on filesystem changes.');
+  }
+
   @override
   SharedOptions readOptions() {
     // The default option parser will throw if we pass additional arguments,
