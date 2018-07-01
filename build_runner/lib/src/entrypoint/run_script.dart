@@ -187,5 +187,12 @@ class RunCommand extends BuildRunnerCommand {
       buildDirs: options.buildDirs,
       logPerformanceDir: options.logPerformanceDir,
     );
+
+    var result = await handler.currentBuild;
+
+    if (result.status == BuildStatus.failure) {
+      stdout.writeln('Skipping script run due to build failure');
+      return result.failureType.exitCode;
+    }
   }
 }
