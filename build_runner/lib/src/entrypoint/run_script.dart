@@ -97,7 +97,9 @@ class RunCommand extends BuildRunnerCommand {
       if (argResults['hot'] != true) {
         return await runFromSingleBuild(
             options, scriptPath, passedArgs, packageConfigPath, outputMap);
-      } else {}
+      } else {
+        return await runWithHotReloading(options, scriptPath, passedArgs, packageConfigPath, outputMap);
+      }
     } finally {
       // Clean up the output dir.
       var dir = new Directory(tempPath);
@@ -160,5 +162,29 @@ class RunCommand extends BuildRunnerCommand {
           'Could not spawn isolate. Ensure that your file is in a valid directory (i.e. "lib", "web", "test).');
       return ExitCode.ioError.code;
     }
+  }
+
+  Future<int> runWithHotReloading(
+      SharedOptions options,
+      String scriptPath,
+      List<String> passedArgs,
+      String packageConfigPath,
+      Map<String, String> outputMap) async {
+    var handler = await watch(
+      builderApplications,
+      deleteFilesByDefault: options.deleteFilesByDefault,
+      enableLowResourcesMode: options.enableLowResourcesMode,
+      configKey: options.configKey,
+      assumeTty: options.assumeTty,
+      outputMap: outputMap,
+      packageGraph: packageGraph,
+      verbose: options.verbose,
+      builderConfigOverrides: options.builderConfigOverrides,
+      isReleaseBuild: options.isReleaseBuild,
+      trackPerformance: options.trackPerformance,
+      skipBuildScriptCheck: options.skipBuildScriptCheck,
+      buildDirs: options.buildDirs,
+      logPerformanceDir: options.logPerformanceDir,
+    );
   }
 }
