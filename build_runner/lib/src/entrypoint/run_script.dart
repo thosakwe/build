@@ -3,13 +3,18 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:async/async.dart';
 import 'package:build_runner/build_runner.dart';
 import 'package:build_runner_core/build_runner_core.dart';
 import 'package:io/io.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
+import 'package:vm_service_lib/vm_service_lib.dart' as vm;
+import 'package:vm_service_lib/vm_service_lib_io.dart' as vm;
 
 import 'base_command.dart';
 import 'options.dart';
@@ -66,13 +71,13 @@ class RunCommand extends BuildRunnerCommand {
 
     // Find the path of the script to run.
     var scriptPath = p.setExtension(p.join(tempPath, scriptName), '.dart');
-    var packageConfigPath = p.join(tempPath, '.packages');
+    var packageConfigPath = p.canonicalize(p.join(tempPath, '.packages'));
 
     var outputMap = options.outputMap ?? {};
     outputMap.addAll({tempPath: null});
 
     try {
-      if (argResults['hot'] != true) {
+      if (argResults['watch'] != true) {
         return await runFromSingleBuild(
             options, scriptPath, passedArgs, packageConfigPath, outputMap);
       } else {
@@ -194,5 +199,72 @@ class RunCommand extends BuildRunnerCommand {
       stdout.writeln('Skipping script run due to build failure');
       return result.failureType.exitCode;
     }
+
+    // We spawn a new VM, with --enable-vm-service=0.
+    // Read the first line to get the path to the Observatory.
+    var vmArgs = [
+      '--enable-vm-service=0',
+      '--packages=$packageConfigPath',
+      scriptPath
+    ];
+    vmArgs.addAll(passedArgs);
+
+    var process = await Process.start(Platform.resolvedExecutable, vmArgs);
+    process.stderr.listen(stderr.add);
+
+    try {
+      var stdoutLines = new StreamQueue<String>(
+          process.stdout.transform(utf8.decoder).transform(LineSplitter()));
+      var firstLine = await stdoutLines.next;
+      var urlMatch = new RegExp(r'Observatory listening on ([^\s$]+)')
+          .firstMatch(firstLine);
+
+      if (urlMatch == null) {
+        throw StateError(
+            'The Dart VM never indicated where its Observatory was listening.');
+      }
+
+      var vmLog = new _BuildRunnerLog(logger);
+      var observatoryUri = Uri.parse(urlMatch[1].trim()).replace(scheme: 'ws');
+      logger.config('VM service URI: $observatoryUri');
+      var client = await vm.vmServiceConnect(
+          observatoryUri.host, observatoryUri.port,
+          log: vmLog);
+      stdoutLines.rest.listen(stdout.writeln);
+
+      await for (var result in handler.buildResults) {
+        var remoteVm = await client.getVM();
+
+        if (result.status == BuildStatus.success) {
+          for (var isolate in remoteVm.isolates) {
+            var reloadReport = await client.reloadSources(isolate.id);
+
+            if (!reloadReport.success) {
+              stderr.writeln('Failed to hot-reload isolate #${isolate
+                  .id}. Check the console for details.');
+            } else {
+              logger.info('Reloaded isolate #${isolate.id}.');
+            }
+          }
+        }
+      }
+
+      process.kill();
+      return await process.exitCode;
+    } finally {
+      process.kill();
+    }
   }
+}
+
+class _BuildRunnerLog implements vm.Log {
+  final Logger logger;
+
+  _BuildRunnerLog(this.logger);
+
+  @override
+  void severe(String message) => logger.severe(message);
+
+  @override
+  void warning(String message) => logger.warning(message);
 }
