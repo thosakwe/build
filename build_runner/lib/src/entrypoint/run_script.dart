@@ -83,7 +83,7 @@ class RunCommand extends BuildRunnerCommand {
       var passedArgs = argResults.rest.skip(1).toList();
 
       // Ensure the extension is .dart.
-      if (p.extension(scriptName) != '.dart') {
+      if (!const ['.dart', '.dill'].contains(p.extension(scriptName))) {
         logger.severe('$scriptName is not a valid Dart file '
             'and cannot be run in the VM.');
         return ExitCode.usage.code;
