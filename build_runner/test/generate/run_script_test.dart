@@ -37,19 +37,57 @@ void main(List<String> args) {
 }
       ''';
       var originalBuildContent = '''
+import 'dart:convert';
 import 'dart:io';
+import 'package:build/build.dart';
 import 'package:build_runner/build_runner.dart';
 import 'package:build_runner_core/build_runner_core.dart';
 import 'package:build_test/build_test.dart';
 
 main(List<String> args) async {
   exitCode = await run(
-      args, [applyToRoot(new TestBuilder(
-        buildExtensions: {
-          '.dart': ['.copy.dart'],
-          '.txt': ['.txt.copy']
-        }
-      ))]);
+      args, [
+        applyToRoot(TestBuilder(
+          buildExtensions: {
+            '.dart': ['.copy.dart'],
+            '.txt': ['.txt.copy']
+          }
+        )),
+        applyToRoot(_DillBuilder()),
+      ]);
+}
+
+class _DillBuilder implements Builder {
+  @override
+  Map<String, List<String>> get buildExtensions {
+    return {
+      '.dart': ['.dill']
+    };
+  }
+
+  @override
+  Future build(BuildStep buildStep) async {
+    var tempDir = await Directory.systemTemp.createTemp();
+    var inputFile = File.fromUri(tempDir.uri.resolve('input.dart'));
+    var outputFile = File.fromUri(tempDir.uri.resolve('output.dill'));
+    var inputId = buildStep.inputId;
+    var outputId = inputId.changeExtension('.dill');
+    var inputBytes = await buildStep.readAsBytes(inputId);
+    await inputFile.writeAsBytes(inputBytes);
+    var result = await Process.run(Platform.resolvedExecutable, [
+      '--snapshot=\${outputFile.path}',
+      '--packages=./.packages',
+      inputFile.path
+    ], stdoutEncoding: utf8, stderrEncoding: utf8);
+
+    if (result.exitCode != 0) {
+      log.severe('Dill compilation terminated with exit code \${result.exitCode}.');
+      log.severe(result.stdout);
+      log.severe(result.stderr);
+    } else {
+      buildStep.writeAsBytes(outputId, await outputFile.readAsBytes());
+    }
+  }
 }
 ''';
 
@@ -57,6 +95,7 @@ main(List<String> args) async {
       // and the actual executable file.
       await d.dir('a', [
         await pubspec('a', currentIsolateDependencies: [
+          'build',
           'build_runner',
           'build_runner_core',
           'build_test',
@@ -86,7 +125,7 @@ main(List<String> args) async {
       expect(result.stdout, contains('Usage: build_runner run'));
     });
 
-    test('extension must be .dart', () async {
+    test('extension must be .dart or .dill', () async {
       // Should throw error 64.
       var result = await runDart('a', 'tool/build.dart',
           args: ['run', 'bin/main.txt.copy', '--output', 'build']);
@@ -112,6 +151,16 @@ main(List<String> args) async {
       // Run the generated script, and examine its output.
       var result = await runDart('a', 'tool/build.dart',
           args: ['run', 'bin/main.copy.dart', '--output', 'build']);
+      var lastLine =
+          LineSplitter().convert(result.stdout as String).last.trim();
+      expect(result.exitCode, 0, reason: result.stderr as String);
+      expect(lastLine, 'it works!', reason: result.stderr as String);
+    });
+
+    test('can run a .dill file', () async {
+      // Run the generated script, and examine its output.
+      var result = await runDart('a', 'tool/build.dart',
+          args: ['run', 'bin/main.dill', '--output', 'build']);
       var lastLine =
           LineSplitter().convert(result.stdout as String).last.trim();
       expect(result.exitCode, 0, reason: result.stderr as String);
